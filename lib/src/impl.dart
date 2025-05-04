@@ -4,11 +4,12 @@ import 'dart:typed_data';
 import 'package:collection/collection.dart';
 import 'package:quiver/core.dart';
 
-class RsaPublicKeyImpl extends PublicKey
-    with Key
-    implements RsaPublicKey, RsaKey {
+class RsaPublicKeyImpl extends Object
+    with AsymmetricKeyBase
+    implements RsaPublicKey {
   @override
   final BigInt exponent;
+
   @override
   final BigInt modulus;
 
@@ -25,26 +26,27 @@ class RsaPublicKeyImpl extends PublicKey
           other.modulus == modulus);
 }
 
-class RsaPrivateKeyImpl extends PrivateKey
-    with Key
-    implements RsaPrivateKey, RsaKey {
-  @override
-  final BigInt firstPrimeFactor;
-
-  @override
-  final BigInt modulus;
-
+class RsaPrivateKeyImpl extends Object
+    with AsymmetricKeyBase
+    implements RsaPrivateKey {
   @override
   final BigInt privateExponent;
 
   @override
+  final BigInt firstPrimeFactor;
+
+  @override
   final BigInt secondPrimeFactor;
 
-  RsaPrivateKeyImpl(
-      {required this.privateExponent,
-      required this.firstPrimeFactor,
-      required this.secondPrimeFactor,
-      required this.modulus});
+  @override
+  final BigInt modulus;
+
+  RsaPrivateKeyImpl({
+    required this.privateExponent,
+    required this.firstPrimeFactor,
+    required this.secondPrimeFactor,
+    required this.modulus,
+  });
 
   @override
   int get hashCode =>
@@ -60,20 +62,23 @@ class RsaPrivateKeyImpl extends PrivateKey
           other.modulus == modulus);
 }
 
-class EcPublicKeyImpl extends PublicKey with Key implements EcPublicKey, EcKey {
-  @override
-  final Identifier curve;
-
+class EcPublicKeyImpl extends Object
+    with AsymmetricKeyBase
+    implements EcPublicKey {
   @override
   final BigInt xCoordinate;
 
   @override
   final BigInt yCoordinate;
 
-  EcPublicKeyImpl(
-      {required this.xCoordinate,
-      required this.yCoordinate,
-      required this.curve});
+  @override
+  final Identifier curve;
+
+  EcPublicKeyImpl({
+    required this.xCoordinate,
+    required this.yCoordinate,
+    required this.curve,
+  });
 
   @override
   int get hashCode => hash3(xCoordinate, yCoordinate, curve);
@@ -87,14 +92,14 @@ class EcPublicKeyImpl extends PublicKey with Key implements EcPublicKey, EcKey {
           other.curve == curve);
 }
 
-class EcPrivateKeyImpl extends PrivateKey
-    with Key
-    implements EcPrivateKey, EcKey {
-  @override
-  final Identifier curve;
-
+class EcPrivateKeyImpl extends Object
+    with AsymmetricKeyBase
+    implements EcPrivateKey {
   @override
   final BigInt eccPrivateKey;
+
+  @override
+  final Identifier curve;
 
   EcPrivateKeyImpl({required this.eccPrivateKey, required this.curve});
 
@@ -110,7 +115,7 @@ class EcPrivateKeyImpl extends PrivateKey
 }
 
 class SymmetricKeyImpl extends Object
-    with Key, PublicKey, PrivateKey
+    with SymmetricKeyBase
     implements SymmetricKey {
   @override
   final Uint8List keyValue;

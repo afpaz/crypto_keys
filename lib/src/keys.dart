@@ -2,38 +2,51 @@ part of '../crypto_keys.dart';
 
 /// A cryptographic key
 abstract class Key {
-  /// Creates an [Encrypter] using this key and the specified algorithm
-  Encrypter createEncrypter(Identifier algorithm) {
-    if (this is SymmetricKey) {
-      return _SymmetricEncrypter(algorithm, this as SymmetricKey);
-    }
-
-    return _AsymmetricEncrypter(algorithm, this);
-  }
+  /// Creates an [Encrypter] using this key and the specified algorithm.
+  Encrypter createEncrypter(Identifier algorithm);
 }
 
 /// A cryptographic public key
-abstract class PublicKey implements Key {
-  /// Creates a signature [Verifier] using this key and the specified algorithm
-  Verifier createVerifier(Identifier algorithm) {
-    if (this is SymmetricKey) {
-      return _SymmetricSignerAndVerifier(algorithm, this as SymmetricKey);
-    }
-
-    return _AsymmetricVerifier(algorithm, this);
-  }
+abstract class PublicKey extends Key {
+  /// Creates a signature [Verifier] using this key and the specified algorithm.
+  Verifier createVerifier(Identifier algorithm);
 }
 
 /// A cryptographic private key
-abstract class PrivateKey implements Key {
+abstract class PrivateKey extends Key {
   /// Creates a [Signer] using this key and the specified algorithm.
-  Signer createSigner(Identifier algorithm) {
-    if (this is SymmetricKey) {
-      return _SymmetricSignerAndVerifier(algorithm, this as SymmetricKey);
-    }
+  Signer createSigner(Identifier algorithm);
+}
 
-    return _AsymmetricSigner(algorithm, this);
-  }
+/// A symmetric cryptographic key
+mixin class SymmetricKeyBase implements Key, PublicKey, PrivateKey {
+  @override
+  Encrypter createEncrypter(Identifier algorithm) =>
+      _SymmetricEncrypter(algorithm, this as SymmetricKey);
+
+  @override
+  Verifier createVerifier(Identifier algorithm) =>
+      _SymmetricSignerAndVerifier(algorithm, this as SymmetricKey);
+
+  @override
+  Signer createSigner(Identifier algorithm) =>
+      _SymmetricSignerAndVerifier(algorithm, this as SymmetricKey);
+}
+
+
+/// An asymmetric cryptographic key
+mixin class AsymmetricKeyBase implements Key, PublicKey, PrivateKey {
+  @override
+  Encrypter createEncrypter(Identifier algorithm) =>
+      _AsymmetricEncrypter(algorithm, this);
+
+  @override
+  Verifier createVerifier(Identifier algorithm) =>
+      _AsymmetricVerifier(algorithm, this);
+
+  @override
+  Signer createSigner(Identifier algorithm) =>
+      _AsymmetricSigner(algorithm, this);
 }
 
 /// Holds a key pair (private and public key)
@@ -45,7 +58,11 @@ class KeyPair {
   final PrivateKey? privateKey;
 
   /// Creates a [KeyPair] from a public and private key
-  KeyPair({required this.publicKey, required this.privateKey});
+  KeyPair({required this.publicKey, required this.privateKey})
+    : assert(
+        publicKey != null || privateKey != null,
+        'At least one key must be provided',
+      );
 
   /// Creates a [KeyPair] from a symmetric key
   KeyPair.symmetric(SymmetricKey key) : this(privateKey: key, publicKey: key);
@@ -57,50 +74,52 @@ class KeyPair {
   factory KeyPair.generateRsa({BigInt? exponent, int bitStrength = 2048}) {
     exponent ??= BigInt.from(65537);
 
-    var generator = pc.RSAKeyGenerator()
-      ..init(pc.ParametersWithRandom(
-          pc.RSAKeyGeneratorParameters(exponent, bitStrength, 5),
-          DefaultSecureRandom()));
+    var generator =
+        pc.RSAKeyGenerator()..init(
+          pc.ParametersWithRandom(
+            pc.RSAKeyGeneratorParameters(exponent, bitStrength, 5),
+            DefaultSecureRandom(),
+          ),
+        );
 
     var pair = generator.generateKeyPair();
 
     return KeyPair(
-        publicKey: RsaPublicKey(
-          exponent: (pair.publicKey as pc.RSAPublicKey).publicExponent!,
-          modulus: (pair.publicKey as pc.RSAPublicKey).n!,
-        ),
-        privateKey: RsaPrivateKey(
-          modulus: (pair.privateKey as pc.RSAPrivateKey).n!,
-          privateExponent:
-              (pair.privateKey as pc.RSAPrivateKey).privateExponent!,
-          firstPrimeFactor: (pair.privateKey as pc.RSAPrivateKey).p!,
-          secondPrimeFactor: (pair.privateKey as pc.RSAPrivateKey).q!,
-        ));
+      publicKey: RsaPublicKey(
+        exponent: pair.publicKey.publicExponent!,
+        modulus: pair.publicKey.n!,
+      ),
+      privateKey: RsaPrivateKey(
+        modulus: pair.privateKey.n!,
+        privateExponent: pair.privateKey.privateExponent!,
+        firstPrimeFactor: pair.privateKey.p!,
+        secondPrimeFactor: pair.privateKey.q!,
+      ),
+    );
   }
 
   factory KeyPair.generateEc(Identifier curve) {
-    var generator = pc.ECKeyGenerator()
-      ..init(
-        pc.ParametersWithRandom(
-          pc.ECKeyGeneratorParameters(
-            _AsymmetricOperator.createCurveParameters(curve),
+    var generator =
+        pc.ECKeyGenerator()..init(
+          pc.ParametersWithRandom(
+            pc.ECKeyGeneratorParameters(
+              _AsymmetricOperator.createCurveParameters(curve),
+            ),
+            DefaultSecureRandom(),
           ),
-          DefaultSecureRandom(),
-        ),
-      );
+        );
 
     var pair = generator.generateKeyPair();
 
     return KeyPair(
-        publicKey: EcPublicKey(
-            xCoordinate:
-                (pair.publicKey as pc.ECPublicKey).Q!.x!.toBigInteger()!,
-            yCoordinate:
-                (pair.publicKey as pc.ECPublicKey).Q!.y!.toBigInteger()!,
-            curve: curve),
-        privateKey: EcPrivateKey(
-            eccPrivateKey: (pair.privateKey as pc.ECPrivateKey).d!,
-            curve: curve));
+      publicKey: EcPublicKey(
+        xCoordinate: pair.publicKey.Q!.x!.toBigInteger()!,
+        yCoordinate: pair.publicKey.Q!.y!.toBigInteger()!,
+        curve: curve,
+      ),
+      privateKey: EcPrivateKey(
+        eccPrivateKey: pair.privateKey.d!, curve: curve),
+    );
   }
 
   /// Create a key pair from a JsonWebKey
@@ -111,58 +130,60 @@ class KeyPair {
         return KeyPair(publicKey: key, privateKey: key);
       case 'RSA':
         return KeyPair(
-            publicKey: jwk.containsKey('n') && jwk.containsKey('e')
-                ? RsaPublicKey(
+          publicKey:
+              jwk.containsKey('n') && jwk.containsKey('e')
+                  ? RsaPublicKey(
                     modulus: _base64ToInt(jwk['n']),
                     exponent: _base64ToInt(jwk['e']),
                   )
-                : null,
-            privateKey: jwk.containsKey('n') &&
-                    jwk.containsKey('d') &&
-                    jwk.containsKey('p') &&
-                    jwk.containsKey('q')
-                ? RsaPrivateKey(
+                  : null,
+          privateKey:
+              jwk.containsKey('n') &&
+                      jwk.containsKey('d') &&
+                      jwk.containsKey('p') &&
+                      jwk.containsKey('q')
+                  ? RsaPrivateKey(
                     modulus: _base64ToInt(jwk['n']),
                     privateExponent: _base64ToInt(jwk['d']),
                     firstPrimeFactor: _base64ToInt(jwk['p']),
                     secondPrimeFactor: _base64ToInt(jwk['q']),
                   )
-                : null);
+                  : null,
+        );
       case 'EC':
         return KeyPair(
-            privateKey: jwk.containsKey('d') && jwk.containsKey('crv')
-                ? EcPrivateKey(
+          privateKey:
+              jwk.containsKey('d') && jwk.containsKey('crv')
+                  ? EcPrivateKey(
                     eccPrivateKey: _base64ToInt(jwk['d']),
-                    curve: _parseCurve(jwk['crv']))
-                : null,
-            publicKey: jwk.containsKey('x') &&
-                    jwk.containsKey('y') &&
-                    jwk.containsKey('crv')
-                ? EcPublicKey(
+                    curve: _parseCurve(jwk['crv']),
+                  )
+                  : null,
+          publicKey:
+              jwk.containsKey('x') &&
+                      jwk.containsKey('y') &&
+                      jwk.containsKey('crv')
+                  ? EcPublicKey(
                     xCoordinate: _base64ToInt(jwk['x']),
                     yCoordinate: _base64ToInt(jwk['y']),
-                    curve: _parseCurve(jwk['crv']))
-                : null);
+                    curve: _parseCurve(jwk['crv']),
+                  )
+                  : null,
+        );
     }
     throw ArgumentError('Unknown key type ${jwk['kty']}');
   }
 
   /// Creates a [Signer] using the private key and the specified algorithm.
-  Signer createSigner(Identifier algorithm) {
-    if (privateKey == null) {
-      throw StateError('Need a private key to create a signer.');
-    }
-    return privateKey!.createSigner(algorithm);
-  }
+  Signer createSigner(Identifier algorithm) =>
+      privateKey?.createSigner(algorithm) ??
+      (throw StateError('Need a private key to create a signer.'));
 
   /// Creates a signature [Verifier] using the public key and the specified
   /// algorithm
-  Verifier createVerifier(Identifier algorithm) {
-    if (publicKey == null) {
-      throw StateError('Need a public key to create a verifier.');
-    }
-    return publicKey!.createVerifier(algorithm);
-  }
+  Verifier createVerifier(Identifier algorithm) =>
+      publicKey?.createVerifier(algorithm) ??
+      (throw StateError('Need a public key to create a verifier.'));
 }
 
 List<int> _base64ToBytes(String encoded) {
@@ -172,17 +193,19 @@ List<int> _base64ToBytes(String encoded) {
 
 BigInt _base64ToInt(String encoded) {
   final b256 = BigInt.from(256);
-  return _base64ToBytes(encoded)
-      .fold(BigInt.zero, (a, b) => a * b256 + BigInt.from(b));
+  return _base64ToBytes(
+    encoded,
+  ).fold(BigInt.zero, (a, b) => a * b256 + BigInt.from(b));
 }
 
 Identifier _parseCurve(String name) {
-  var v = {
-    'P-256': curves.p256,
-    'P-256K': curves.p256k,
-    'P-384': curves.p384,
-    'P-521': curves.p521,
-  }[name];
+  var v =
+      {
+        'P-256': curves.p256,
+        'P-256K': curves.p256k,
+        'P-384': curves.p384,
+        'P-521': curves.p521,
+      }[name];
   if (v == null) {
     throw UnsupportedError('Unknown curve $name');
   }

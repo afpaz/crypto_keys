@@ -1,6 +1,6 @@
 part of '../crypto_keys.dart';
 
-abstract class _AsymmetricOperator<T extends Key> implements Operator<T> {
+mixin _AsymmetricOperator<T extends Key> implements Operator<T> {
   static pc.ECDomainParameters createCurveParameters(Identifier curve) {
     var name = curve.name.split('/').last;
     switch (name) {
@@ -13,7 +13,7 @@ abstract class _AsymmetricOperator<T extends Key> implements Operator<T> {
       case 'P-521':
         return pc.ECCurve_secp521r1();
     }
-    throw ArgumentError('Unknwon curve type $name');
+    throw ArgumentError('Unknown curve type $name');
   }
 
   pc.ECDomainParameters get ecDomainParameters =>

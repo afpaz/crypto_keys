@@ -1,7 +1,7 @@
 part of '../crypto_keys.dart';
 
 /// A symmetric key
-abstract class SymmetricKey extends Key with PublicKey, PrivateKey {
+abstract class SymmetricKey extends Key implements PublicKey, PrivateKey {
   /// The value of the symmetric (or other single-valued) key
   Uint8List get keyValue;
 
@@ -10,7 +10,8 @@ abstract class SymmetricKey extends Key with PublicKey, PrivateKey {
   factory SymmetricKey.generate(int bitLength) {
     if (bitLength % 8 != 0) {
       throw ArgumentError(
-          'Illegal bit length $bitLength, should be mutiple of 8.');
+        'Illegal bit length $bitLength, should be multiple of 8.',
+      );
     }
     var value = DefaultSecureRandom().nextBytes(bitLength ~/ 8);
     return SymmetricKey(keyValue: value);
