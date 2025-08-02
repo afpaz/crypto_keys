@@ -4,6 +4,7 @@ version: 0.3.0+2
 homepage: https://github.com/appsup-dart/crypto_keys
 funding:
  - https://github.com/sponsors/rbellens
+publish_to: none
 
 environment:
   sdk: ^3.7.2
